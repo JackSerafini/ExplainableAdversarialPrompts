@@ -18,6 +18,6 @@ pip install -r requirements.txt
 Allora, dobbiamo
 - [ ] Generare tot frasi da algoritmo di Lorenzo
 - [ ] Per ogni frase, applicare TokenSHAP e analizzare quali sono i token "importanti"
-    - [x] Creare file unico per gestire SHAP
+    - [ ] Creare file unico per gestire SHAP
     - [ ] Dividere le frasi in token, non più parole/frasi
-    - [ ] Ottenere risposte con meno token rispetto a quelle complete che SHAP genera
+    - [x] Ottenere risposte con meno token rispetto a quelle complete che SHAP genera
