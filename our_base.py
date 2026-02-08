@@ -10,8 +10,6 @@ from abc import ABC, abstractmethod
 from tqdm.auto import tqdm
 import random
 import torch
-from PIL import Image
-import requests
 import base64
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
@@ -55,7 +53,7 @@ class ModelBase(ABC):
         self.client = None
         
     @abstractmethod
-    def generate(self, prompt: str, image_path: Optional[str] = None) -> str:
+    def generate(self, prompt: str) -> str:
         """Generate response from model"""
         pass
 
@@ -140,7 +138,7 @@ class LocalModel(ModelBase):
                 max_new_tokens: int = 100,
                 temperature: float = 0.5,
                 device: str = "auto",
-                torch_dtype: Optional[str] = "bfloat16",
+                dtype: Optional[str] = "bfloat16",
                 **model_kwargs):
         """
         Initialize local model
@@ -151,7 +149,7 @@ class LocalModel(ModelBase):
             max_new_tokens: Maximum new tokens to generate
             temperature: Generation temperature
             device: Device to run model on ("auto", "cuda", "cpu")
-            torch_dtype: Torch data type for model
+            dtype: Torch data type for model
             **model_kwargs: Additional kwargs for model initialization
         """
         super().__init__(model_name)
@@ -162,7 +160,7 @@ class LocalModel(ModelBase):
         self.model = None
         self.processor = None
         self.tokenizer = None
-        self.torch_dtype = getattr(torch, torch_dtype) if torch_dtype else None
+        self.dtype = getattr(torch, dtype) if dtype else None
         self.model_kwargs = model_kwargs
         self._initialize_model()
         
@@ -174,25 +172,7 @@ class LocalModel(ModelBase):
                 self.tokenizer = AutoTokenizer.from_pretrained(self.model_name)
                 self.model = AutoModelForCausalLM.from_pretrained(
                     self.model_name,
-                    torch_dtype=self.torch_dtype,
-                    device_map=self.device,
-                    **self.model_kwargs
-                )
-            elif self.model_type == "vision":
-                from transformers import AutoProcessor
-                # Import the specific model class based on model_name
-                # This is just an example - adjust based on your needs
-                if "llama" in self.model_name.lower():
-                    from transformers import LlamaForConditionalGeneration
-                    model_class = LlamaForConditionalGeneration
-                else:
-                    from transformers import AutoModelForCausalLM
-                    model_class = AutoModelForCausalLM
-                    
-                self.processor = AutoProcessor.from_pretrained(self.model_name)
-                self.model = model_class.from_pretrained(
-                    self.model_name,
-                    torch_dtype=self.torch_dtype,
+                    dtype=self.dtype,
                     device_map=self.device,
                     **self.model_kwargs
                 )
@@ -200,67 +180,54 @@ class LocalModel(ModelBase):
                 raise ValueError(f"Unsupported model type: {self.model_type}")
         except Exception as e:
             raise ImportError(f"Error initializing model: {str(e)}")
-            
-    def _process_image(self, image_path: str) -> Image:
-        """Load and process image file"""
-        try:
-            if image_path.startswith(('http://', 'https://')):
-                image = Image.open(requests.get(image_path, stream=True).raw)
-            else:
-                image = Image.open(image_path)
-            return image
-        except Exception as e:
-            raise ValueError(f"Error loading image: {str(e)}")
     
-    def generate(self, prompt: str, image_path: Optional[str] = None) -> str:
+    def generate(self, prompt: str) -> str:
         """
-        Generate text from prompt and optional image
+        Generate text from prompt
         
         Args:
             prompt: Text prompt
-            image_path: Optional path to image file
             
         Returns:
             Generated text response
         """
         try:
-            if image_path and self.model_type != "vision":
-                raise ValueError("Image input provided but model does not support vision")
-                
-            if image_path:
-                # Vision model processing
-                image = self._process_image(image_path)
-                inputs = self.processor(
-                    image, 
-                    prompt,
-                    return_tensors="pt"
-                ).to(self.model.device)
-                
-                outputs = self.model.generate(
-                    **inputs,
-                    max_new_tokens=self.max_new_tokens,
-                    temperature=self.temperature
-                )
-                return self.processor.decode(outputs[0])
-            else:
-                # Text-only processing
-                inputs = self.tokenizer(prompt, return_tensors="pt")
-                # inputs = self.tokenizer.apply_chat_template()
-                inputs = {k: v.to(self.model.device) for k, v in inputs.items()}
-                input_length = inputs["input_ids"].shape[1]
-                
-                outputs = self.model.generate(
-                    **inputs,
-                    max_new_tokens=self.max_new_tokens,
-                    temperature=self.temperature,
-                    pad_token_id=self.tokenizer.eos_token_id
-                )
-                
-                generated_tokens = outputs[0][input_length:]
-                return self.tokenizer.decode(
-                    generated_tokens,
-                    skip_special_tokens=True
-                ).strip()
+            # Text-only processing
+            # inputs = self.tokenizer(prompt, return_tensors="pt")
+            # CUSTOM TOKENIZER
+            inputs = self.tokenizer.apply_chat_template(
+                prompt,
+                add_generation_prompt=True,
+                tokenize=True,
+                return_dict=True,
+                return_tensors="pt",
+            )
+            inputs = {k: v.to(self.model.device) for k, v in inputs.items()}
+            input_length = inputs["input_ids"].shape[1]
+
+            # outputs = self.model.generate(
+            #     **inputs,
+            #     max_new_tokens=self.max_new_tokens,
+            #     temperature=self.temperature,
+            #     pad_token_id=self.tokenizer.eos_token_id
+            # )
+            # CUSTOM GENERATION
+            outputs = self.model.generate(
+                **inputs,
+                max_new_tokens=self.max_new_tokens,
+                do_sample=False,
+                temperature=self.temperature,
+                top_p=None,
+                pad_token_id=self.tokenizer.eos_token_id
+            )
+
+            # Qua andiamo a prenderci esclusivamente i token generati dal modello
+            # -> in outputs ci sono gli inputs con gli outputs appended
+            generated_tokens = outputs[0][input_length:]
+            return self.tokenizer.decode( # Converts token IDs back into text
+                generated_tokens,
+                skip_special_tokens=True # Removes special tokens like: <s>, <|eos|>, ...
+            ).strip() # Removes leading/trailing whitespace
                 
         except Exception as e:
             raise RuntimeError(f"Error generating response: {str(e)}")
@@ -285,7 +252,9 @@ class BaseSHAP(ABC):
 
     def _calculate_baseline(self, content: Any, **kwargs) -> str:
         """Calculate baseline model response"""
-        return self.model.generate(**self._prepare_generate_args(content, **kwargs))
+        # return self.model.generate(**self._prepare_generate_args(content, **kwargs))
+        # CUSTOM RETURN
+        return self.model.generate(self._prepare_generate_args(content, **kwargs))
 
     @abstractmethod
     def _prepare_generate_args(self, content: Any, **kwargs) -> Dict:
@@ -331,6 +300,7 @@ class BaseSHAP(ABC):
             sampling_ratio: Ratio of non-essential combinations to sample (0-1)
             max_combinations: Maximum number of combinations (must be >= n for n tokens)
         """
+        # Dividi il prompt secondo lo Splitter
         samples = self._get_samples(content)
         n = len(samples)
 
@@ -384,7 +354,9 @@ class BaseSHAP(ABC):
         responses = {}
         for idx, (combination, indexes) in enumerate(tqdm(all_combinations, desc="Processing combinations")):
             args = self._prepare_combination_args(combination, content)
-            response = self.model.generate(**args)
+            # response = self.model.generate(**args)
+            # CUSTOM RESPONSES
+            response = self.model.generate(args)
 
             key = self._get_combination_key(combination, indexes)
             responses[key] = (response, indexes)

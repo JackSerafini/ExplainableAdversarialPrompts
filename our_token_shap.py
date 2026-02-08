@@ -62,7 +62,9 @@ class TokenSHAP(BaseSHAP):
 
     def _prepare_generate_args(self, content: str, **kwargs) -> Dict:
         """Prepare arguments for model.generate()"""
-        return {"prompt": content}
+        # return {"prompt": content}
+        # CUSTOM CHAT TEMPLATE
+        return [{"role": "user", "content": content},]
 
     def _get_samples(self, content: str) -> List[str]:
         """Get tokens from prompt"""
@@ -70,12 +72,34 @@ class TokenSHAP(BaseSHAP):
 
     def _prepare_combination_args(self, combination: List[str], original_content: str) -> Dict:
         """Prepare model arguments for a combination"""
-        return {"prompt": self.splitter.join(combination)}
+        # return {"prompt": self.splitter.join(combination)}
+        # CUSTOM CHAT TEMPLATE
+        return [{"role": "user", "content": self.splitter.join(combination)},]
 
     def _get_combination_key(self, combination: List[str], indexes: Tuple[int, ...]) -> str:
         """Get unique key for combination"""
         text = self.splitter.join(combination)
         return text + '_' + ','.join(str(index) for index in indexes)
+    
+    # CUSTOM HELPER FUNCTION TO RENDER DECODED TEXT
+    def _decode_token_for_display(self, token: str) -> str:
+        """
+        Convert a tokenizer token into readable text
+        WITHOUT changing token identity.
+        """
+        # Remove your internal suffix (from TokenSHAP)
+        token = get_text_before_last_underscore(token)
+    
+        # Convert token string → token id → decoded string
+        token_id = self.model.tokenizer.convert_tokens_to_ids(token)
+    
+        if token_id is None or token_id == self.model.tokenizer.unk_token_id:
+            return token  # fallback (should rarely happen)
+    
+        return self.model.tokenizer.decode(
+            [token_id],
+            clean_up_tokenization_spaces=False
+        )
 
     def print_colored_text(self):
         """Print text with tokens colored by importance"""
@@ -99,12 +123,15 @@ class TokenSHAP(BaseSHAP):
 
         for token, value in self.shapley_values.items():
             color = get_color(value)
+            text = self._decode_token_for_display(token)
             print(
                 f"\033[38;2;{int(color[1:3], 16)};"
                 f"{int(color[3:5], 16)};"
                 f"{int(color[5:7], 16)}m"
-                f"{get_text_before_last_underscore(token)}\033[0m",
-                end=' '
+                # f"{get_text_before_last_underscore(token)}\033[0m",
+                f"{text}\033[0m",
+                # end=' '
+                end=''
             )
         print()
 
@@ -212,8 +239,8 @@ class TokenSHAP(BaseSHAP):
             DataFrame with analysis results
         """
         # Clean prompt
-        prompt = prompt.strip()
-        prompt = re.sub(r'\s+', ' ', prompt)
+        # prompt = prompt.strip()
+        # prompt = re.sub(r'\s+', ' ', prompt)
 
         # Get baseline and process combinations using base class methods
         self.baseline_text = self._calculate_baseline(prompt)
