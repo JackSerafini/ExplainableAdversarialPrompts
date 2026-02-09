@@ -212,7 +212,7 @@ class LocalModel(ModelBase):
             return self.tokenizer.decode( # Converts token IDs back into text
                 generated_tokens,
                 skip_special_tokens=True # Removes special tokens like: <s>, <|eos|>, ...
-            ).strip(), inputs # Removes leading/trailing whitespace
+            ).strip() # Removes leading/trailing whitespace
                 
         except Exception as e:
             raise RuntimeError(f"Error generating response: {str(e)}")
@@ -341,7 +341,7 @@ class BaseSHAP(ABC):
             args = self._prepare_combination_args(combination, content)
             # response = self.model.generate(**args)
             # CUSTOM RESPONSES
-            response, _ = self.model.generate(args)
+            response = self.model.generate(args)
 
             key = self._get_combination_key(combination, indexes)
             responses[key] = (response, indexes)
@@ -422,25 +422,46 @@ class BaseSHAP(ABC):
     #         with open(os.path.join(output_dir, "metadata.json"), 'w') as f:
     #             json.dump(metadata, f, indent=2)
 
-    def save_results(self, output_dir: str, filename: str) -> None:
-        from collections import defaultdict
-
+    def save_results(self, output_dir: str, filename: str, run_id: str, prompt: str | None = None) -> None:
         os.makedirs(output_dir, exist_ok=True)
+        path = os.path.join(output_dir, filename)
 
-        if self.shapley_values is None or self.input_ids is None:
-            raise ValueError("Missing Shapley values or input_ids.")
+        if self.shapley_values is None:
+            raise ValueError("Missing Shapley values.")
 
-        vocab_shapley = defaultdict(lambda: {
-            "token": None,
-            "value": 0.0
-        })
+        # Load existing file (if present)
+        if os.path.exists(path):
+            with open(path, "r", encoding="utf-8") as f:
+                all_results = json.load(f)
+        else:
+            all_results = {}
 
-        for token_id, token_str, shap_val in zip(
-            self.input_ids, self.tokens, self.shapley_values
-        ):
-            tid = int(token_id)
-            vocab_shapley[tid]["token"] = token_str
-            vocab_shapley[tid]["value"] += float(shap_val)
+        run_data = {}
 
-        with open(os.path.join(output_dir, filename), "w") as f:
-            json.dump(vocab_shapley, f, indent=2)
+        for token_key, value in self.shapley_values.items():
+            token, pos = token_key.rsplit("_", 1)
+            pos = int(pos)
+
+            token_id = self.model.tokenizer.convert_tokens_to_ids(token)
+            if token_id is None or token_id == self.model.tokenizer.unk_token_id:
+                decoded = token
+            else:
+                decoded = self.model.tokenizer.decode(
+                    [token_id],
+                    clean_up_tokenization_spaces=False
+                )
+
+            run_data[token_key] = {
+                "token_id": int(token_id),
+                "decoded": decoded,
+                "position": pos,
+                "shapley_value": float(value)
+            }
+
+        all_results[run_id] = {
+            "prompt": prompt,
+            "tokens": run_data
+        }
+
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(all_results, f, indent=2, ensure_ascii=False)

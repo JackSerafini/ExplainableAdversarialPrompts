@@ -244,7 +244,7 @@ class TokenSHAP(BaseSHAP):
         # prompt = re.sub(r'\s+', ' ', prompt)
 
         # Get baseline and process combinations using base class methods
-        self.baseline_text, input_ids = self._calculate_baseline(prompt)
+        self.baseline_text = self._calculate_baseline(prompt)
         responses = self._get_result_per_combination(
             prompt, 
             sampling_ratio=sampling_ratio,
@@ -260,4 +260,4 @@ class TokenSHAP(BaseSHAP):
         if print_highlight_text:
             self.highlight_text_background()
 
-        return self.results_df, input_ids
+        return self.results_df
