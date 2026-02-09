@@ -1,6 +1,6 @@
 import torch
 from prompt import PROMPT
-from transformers import AutoTokenizer, AutoModelForCausalLM
+from transformers import AutoTokenizer
 
 class AdversarialPromptGenerator:
     def __init__(
