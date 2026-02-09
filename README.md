@@ -61,19 +61,26 @@ Where `token_shap.print_colored_text()` will print the prompt where each token w
 
 The analysis focuses on the Shapley values computed over 100 runs for the model responses given a set of highly constrained prompts. Each run contains token-level contributions to the model’s output, which allows us to quantify which tokens had the most influence on the model’s behavior.
 
-### 1. Aggregate Token Importance TODO!!!
+### 1. Aggregate Token Importance
 
 Across all 100 runs, we calculated the mean Shapley value for each token to identify the most influential words in guiding the model’s response. Tokens such as "ful", "user", "request", "if", "bit", and "worry" consistently appeared with higher Shapley values, indicating they were key drivers in shaping the response according to the instructions in the prompt.
 
-A summary of the top 10 tokens by mean Shapley value is shown below:???
+A summary of the top 20 tokens by mean Shapley value is shown below:
+
+![](results\top_tokens_shapley.png)
+
+Even though many other words had their importance, as we can see mainly very specific characters had the most importance in changing the model's output.
 
 ### 2. Distribution of Shapley Values
 
-The distribution of Shapley values shows that most tokens contribute minimally, while a small subset consistently drives the model output. This is consistent with the expectation that only key directive words in the prompt influence the model's adherence to strict response rules.
+The distribution of Shapley values shows that most tokens contribute minimally, while a small subset consistently drives the model output. This is consistent with the expectation that only key directive words in the prompt influence the model's adherence to strict response rules:
+
+![](results\shapley_by_position.png)
+
+In fact, we can see how, on average, tokens that were positioned at the end, which means that they were part of the adversarial suffix, are the most important. This, of course, is to be expected as it is the suffix itself to actually change the model's output.
 
 ### 3. Key Insights
 
 - Directive words dominate contribution: Words that directly guide the model’s behavior, such as "ful", "request", "Always", and "follow", have the largest positive Shapley values.
 - Sparsity of influence: Most tokens, particularly filler words, spaces, and punctuation, contribute negligibly to the model's output.
-- Positional importance: Tokens at the beginning of the instruction prompt carry more influence than those later in the prompt.
-- Consistency across runs: The Shapley contributions for the most influential tokens remain stable across 100 runs, confirming the robustness of these findings.
+- Positional importance: Tokens at the beginning of the instruction prompt carry more influence than those in the middle of the prompt.
