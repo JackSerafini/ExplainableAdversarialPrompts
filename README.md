@@ -67,7 +67,7 @@ Across all 100 runs, we calculated the mean Shapley value for each token to iden
 
 A summary of the top 20 tokens by mean Shapley value is shown below:
 
-![](results\top_tokens_shapley.png)
+![](./results/top_tokens_shapley.png)
 
 Even though many other words had their importance, as we can see mainly very specific characters had the most importance in changing the model's output.
 
@@ -75,7 +75,7 @@ Even though many other words had their importance, as we can see mainly very spe
 
 The distribution of Shapley values shows that most tokens contribute minimally, while a small subset consistently drives the model output. This is consistent with the expectation that only key directive words in the prompt influence the model's adherence to strict response rules:
 
-![](results\shapley_by_position.png)
+![](./results/shapley_by_position.png)
 
 In fact, we can see how, on average, tokens that were positioned at the end, which means that they were part of the adversarial suffix, are the most important. This, of course, is to be expected as it is the suffix itself to actually change the model's output.
 
