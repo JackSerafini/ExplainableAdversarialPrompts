@@ -18,19 +18,6 @@ def default_output_handler(message: str) -> None:
     """Prints messages without newline."""
     print(message, end='', flush=True)
 
-def encode_image_to_base64(image_path: str) -> str:
-    """
-    Converts an image file to a base64-encoded string.
-    
-    Args:
-    image_path (str): Path to the image file.
-
-    Returns:
-    str: Base64-encoded string of the image.
-    """
-    with open(image_path, "rb") as image_file:
-        return base64.b64encode(image_file.read()).decode('utf-8')
-
 def get_text_before_last_underscore(token):
     return token.rsplit('_', 1)[0]
 
