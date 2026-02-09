@@ -1,9 +1,10 @@
 # token_shap.py
 
 from typing import List, Dict, Optional, Tuple
-import pandas as pd
 import re
 import matplotlib.pyplot as plt
+import pandas as pd
+
 from our_base import BaseSHAP, TextVectorizer, ModelBase
 
 def get_text_before_last_underscore(token: str) -> str:

@@ -1,7 +1,6 @@
 # base.py
 
 from typing import Optional, List, Dict, Tuple, Any, Callable, Set
-import base64
 import numpy as np
 import pandas as pd
 import os
@@ -10,7 +9,6 @@ from abc import ABC, abstractmethod
 from tqdm.auto import tqdm
 import random
 import torch
-import base64
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 
