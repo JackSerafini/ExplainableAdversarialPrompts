@@ -212,7 +212,7 @@ class LocalModel(ModelBase):
             return self.tokenizer.decode( # Converts token IDs back into text
                 generated_tokens,
                 skip_special_tokens=True # Removes special tokens like: <s>, <|eos|>, ...
-            ).strip() # Removes leading/trailing whitespace
+            ).strip(), inputs # Removes leading/trailing whitespace
                 
         except Exception as e:
             raise RuntimeError(f"Error generating response: {str(e)}")
@@ -341,7 +341,7 @@ class BaseSHAP(ABC):
             args = self._prepare_combination_args(combination, content)
             # response = self.model.generate(**args)
             # CUSTOM RESPONSES
-            response = self.model.generate(args)
+            response, _ = self.model.generate(args)
 
             key = self._get_combination_key(combination, indexes)
             responses[key] = (response, indexes)
@@ -407,17 +407,40 @@ class BaseSHAP(ABC):
         """Get unique key for combination"""
         pass
 
-    def save_results(self, output_dir: str, metadata: Optional[Dict] = None) -> None:
-        """Save analysis results"""
-        os.makedirs(output_dir, exist_ok=True)
+    # def save_results(self, output_dir: str, metadata: Optional[Dict] = None) -> None:
+    #     """Save analysis results"""
+    #     os.makedirs(output_dir, exist_ok=True)
         
-        if self.results_df is not None:
-            self.results_df.to_csv(os.path.join(output_dir, "results.csv"), index=False)
+    #     if self.results_df is not None:
+    #         self.results_df.to_csv(os.path.join(output_dir, "results.csv"), index=False)
             
-        if self.shapley_values is not None:
-            with open(os.path.join(output_dir, "shapley_values.json"), 'w') as f:
-                json.dump(self.shapley_values, f, indent=2)
+    #     if self.shapley_values is not None:
+    #         with open(os.path.join(output_dir, "shapley_values.json"), 'w') as f:
+    #             json.dump(self.shapley_values, f, indent=2)
                 
-        if metadata:
-            with open(os.path.join(output_dir, "metadata.json"), 'w') as f:
-                json.dump(metadata, f, indent=2)
+    #     if metadata:
+    #         with open(os.path.join(output_dir, "metadata.json"), 'w') as f:
+    #             json.dump(metadata, f, indent=2)
+
+    def save_results(self, output_dir: str, filename: str) -> None:
+        from collections import defaultdict
+
+        os.makedirs(output_dir, exist_ok=True)
+
+        if self.shapley_values is None or self.input_ids is None:
+            raise ValueError("Missing Shapley values or input_ids.")
+
+        vocab_shapley = defaultdict(lambda: {
+            "token": None,
+            "value": 0.0
+        })
+
+        for token_id, token_str, shap_val in zip(
+            self.input_ids, self.tokens, self.shapley_values
+        ):
+            tid = int(token_id)
+            vocab_shapley[tid]["token"] = token_str
+            vocab_shapley[tid]["value"] += float(shap_val)
+
+        with open(os.path.join(output_dir, filename), "w") as f:
+            json.dump(vocab_shapley, f, indent=2)
